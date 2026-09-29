@@ -728,8 +728,12 @@ const MonacoEditor = (props: monacoEditorProps): ReturnType<typeof PrimitiveEdit
 
     if (!aiPort) return
 
+    const modelUri = editorRef.current?.getModel()?.uri
+    if (!modelUri) return
+
     const registration = registerAIInlineCompletions(aiPort, {
       monacoInstance: monaco,
+      modelUri,
       pouName: name,
       language,
       session: edgeAccount?.session,
@@ -739,6 +743,8 @@ const MonacoEditor = (props: monacoEditorProps): ReturnType<typeof PrimitiveEdit
   }, [
     name,
     language,
+    editorModelPath,
+    editorInstanceId,
     aiState.isEnabled,
     aiState.hasConsented,
     aiState.preferences.inlineCompletionsEnabled,

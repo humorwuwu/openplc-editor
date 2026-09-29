@@ -5,6 +5,8 @@ import type { AIPort } from '../../../../middleware/shared/ports/ai-port'
 import { isImeComposing, setImeComposing } from '../ime-state'
 import { __resetInlineCompletionsForTests, registerAIInlineCompletions } from '../inline-completions'
 
+const modelUri = (path: string) => ({ scheme: 'inmemory', fsPath: path }) as unknown as monaco.Uri
+
 type FakeEditor = { onDidCompositionStart: (cb: () => void) => void; onDidCompositionEnd: (cb: () => void) => void }
 
 function makePort(warmCache: () => void): AIPort {
@@ -71,6 +73,7 @@ describe('registerAIInlineCompletions', () => {
 
     const registration = registerAIInlineCompletions(port, {
       monacoInstance: fakeMonaco,
+      modelUri: modelUri('/Main.st'),
       pouName: 'Main',
       language: 'st',
     })
@@ -97,6 +100,7 @@ describe('registerAIInlineCompletions', () => {
     // Second registration: neither latch fires again.
     const second = registerAIInlineCompletions(port, {
       monacoInstance: fakeMonaco,
+      modelUri: modelUri('/Other.st'),
       pouName: 'Other',
       language: 'st',
     })
@@ -116,10 +120,45 @@ describe('registerAIInlineCompletions', () => {
 
     const registration = registerAIInlineCompletions(port, {
       monacoInstance: fakeMonaco,
+      modelUri: modelUri('/Main.st'),
       pouName: 'Main',
       language: 'st',
     })
     expect(registration.dispose).toBeInstanceOf(Function)
     registration.dispose()
+  })
+
+  it('scopes each provider to its own model, not to every model of the language', () => {
+    const selectors: unknown[] = []
+    const fakeMonaco = {
+      languages: {
+        registerInlineCompletionsProvider: (selector: unknown) => {
+          selectors.push(selector)
+          return { dispose: () => undefined }
+        },
+      },
+      editor: { getEditors: () => [], onDidCreateEditor: () => undefined },
+    } as unknown as typeof monaco
+    const port = makePort(() => undefined)
+
+    const main = registerAIInlineCompletions(port, {
+      monacoInstance: fakeMonaco,
+      modelUri: modelUri('/Main.st'),
+      pouName: 'Main',
+      language: 'st',
+    })
+    const other = registerAIInlineCompletions(port, {
+      monacoInstance: fakeMonaco,
+      modelUri: modelUri('/Other.st'),
+      pouName: 'Other',
+      language: 'st',
+    })
+
+    expect(selectors).toEqual([
+      { language: 'st', scheme: 'inmemory', pattern: '/Main.st' },
+      { language: 'st', scheme: 'inmemory', pattern: '/Other.st' },
+    ])
+    main.dispose()
+    other.dispose()
   })
 })

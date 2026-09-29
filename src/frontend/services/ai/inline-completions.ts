@@ -32,6 +32,7 @@ export function registerAIInlineCompletions(
   ai: AIPort,
   params: {
     monacoInstance: typeof monaco
+    modelUri: monaco.Uri
     pouName: string
     language: AICompletionLanguage
     session?: EdgeSessionState
@@ -46,7 +47,13 @@ export function registerAIInlineCompletions(
   wireImeCompositionListeners(params.monacoInstance)
 
   const provider = new AIInlineCompletionProvider(params.pouName, params.language, ai, params.session)
-  const disposable = params.monacoInstance.languages.registerInlineCompletionsProvider(params.language, provider)
+  // Scoped to this editor's model: a language-only selector would answer for every open POU of that language.
+  const selector: monaco.languages.LanguageFilter = {
+    language: params.language,
+    scheme: params.modelUri.scheme,
+    pattern: params.modelUri.fsPath,
+  }
+  const disposable = params.monacoInstance.languages.registerInlineCompletionsProvider(selector, provider)
 
   return {
     dispose() {
